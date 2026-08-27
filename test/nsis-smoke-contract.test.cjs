@@ -56,6 +56,8 @@ test('NSIS smoke verifies install, repair, shortcuts, registry, and both uninsta
   assert.match(smoke, /DeepSeek Harness Desktop NSIS Boundary/u)
   assert.match(smoke, /must-survive\.json/u)
   assert.match(smoke, /waitForRegistryCleanup/u)
+  assert.match(smoke, /fs\.realpathSync\.native/u)
+  assert.match(smoke, /actual=\$\{link\.target\}; expected=\$\{executable\}/u)
   assert.doesNotMatch(smoke, /manifest\.name, manifest\.build\.win\.executableName/u)
   assert.doesNotMatch(smoke, /rmSync\(installDirectory/u)
   assert.match(smoke, /cleanup-owned-remnants-complete/u)

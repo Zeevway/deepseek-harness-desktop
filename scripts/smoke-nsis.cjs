@@ -164,7 +164,15 @@ $result = [ordered]@{ target = [string]$link.TargetPath; arguments = [string]$li
 }
 
 function samePath(left, right) {
-  return path.resolve(left).toLocaleLowerCase('en-US') === path.resolve(right).toLocaleLowerCase('en-US')
+  const canonical = (value) => {
+    const resolved = path.resolve(value)
+    try {
+      return fs.realpathSync.native(resolved).toLocaleLowerCase('en-US')
+    } catch {
+      return resolved.toLocaleLowerCase('en-US')
+    }
+  }
+  return canonical(left) === canonical(right)
 }
 
 function sha256(filename) {
@@ -360,7 +368,11 @@ async function validateInstalledState(installDirectory, shortcuts) {
   for (const shortcut of shortcuts) {
     const link = await readShortcut(shortcut)
     assert.ok(link, `shortcut is missing: ${shortcut}`)
-    assert.equal(samePath(link.target, executable), true, `shortcut target is wrong: ${shortcut}`)
+    assert.equal(
+      samePath(link.target, executable),
+      true,
+      `shortcut target is wrong: ${shortcut}; actual=${link.target}; expected=${executable}`,
+    )
   }
 
   return {
