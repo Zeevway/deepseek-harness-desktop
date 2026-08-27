@@ -155,9 +155,101 @@ $rows = @(
 async function readShortcut(shortcut) {
   if (!fs.existsSync(shortcut)) return null
   const output = await runPowerShell(`
-$shell = New-Object -ComObject WScript.Shell
-$link = $shell.CreateShortcut($env:DSH_SMOKE_SHORTCUT)
-$result = [ordered]@{ target = [string]$link.TargetPath; arguments = [string]$link.Arguments }
+Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+using System.Runtime.InteropServices.ComTypes;
+using System.Text;
+
+[ComImport]
+[Guid("00021401-0000-0000-C000-000000000046")]
+internal class ShellLink { }
+
+[ComImport]
+[InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+[Guid("000214F9-0000-0000-C000-000000000046")]
+internal interface IShellLinkW
+{
+    [PreserveSig]
+    int GetPath(
+        [Out, MarshalAs(UnmanagedType.LPWStr)] StringBuilder file,
+        int capacity,
+        IntPtr findData,
+        uint flags);
+
+    [PreserveSig]
+    int GetIDList(out IntPtr itemIdList);
+
+    [PreserveSig]
+    int SetIDList(IntPtr itemIdList);
+
+    [PreserveSig]
+    int GetDescription(
+        [Out, MarshalAs(UnmanagedType.LPWStr)] StringBuilder description,
+        int capacity);
+
+    [PreserveSig]
+    int SetDescription([MarshalAs(UnmanagedType.LPWStr)] string description);
+
+    [PreserveSig]
+    int GetWorkingDirectory(
+        [Out, MarshalAs(UnmanagedType.LPWStr)] StringBuilder directory,
+        int capacity);
+
+    [PreserveSig]
+    int SetWorkingDirectory([MarshalAs(UnmanagedType.LPWStr)] string directory);
+
+    [PreserveSig]
+    int GetArguments(
+        [Out, MarshalAs(UnmanagedType.LPWStr)] StringBuilder arguments,
+        int capacity);
+}
+
+public static class DshShellLinkReader
+{
+    private static void RequireSuccess(int result, string operation)
+    {
+        if (result != 0)
+        {
+            throw new COMException(operation + " returned HRESULT 0x" + result.ToString("X8"), result);
+        }
+    }
+
+    public static string[] ReadShortcut(string shortcut)
+    {
+        object instance = new ShellLink();
+        try
+        {
+            ((IPersistFile)instance).Load(shortcut, 0);
+            var shellLink = (IShellLinkW)instance;
+            var target = new StringBuilder(32768);
+            RequireSuccess(shellLink.GetPath(
+                target,
+                target.Capacity,
+                IntPtr.Zero,
+                4), "IShellLinkW.GetPath");
+            if (target.Length == 0)
+            {
+                throw new InvalidOperationException("IShellLinkW.GetPath returned an empty target");
+            }
+            var arguments = new StringBuilder(32768);
+            RequireSuccess(
+                shellLink.GetArguments(arguments, arguments.Capacity),
+                "IShellLinkW.GetArguments");
+            return new[] { target.ToString(), arguments.ToString() };
+        }
+        finally
+        {
+            Marshal.FinalReleaseComObject(instance);
+        }
+    }
+}
+'@
+$values = [DshShellLinkReader]::ReadShortcut($env:DSH_SMOKE_SHORTCUT)
+$result = [ordered]@{
+  target = [string]$values[0]
+  arguments = [string]$values[1]
+}
 [Console]::Out.Write(($result | ConvertTo-Json -Compress))
 `, { DSH_SMOKE_SHORTCUT: shortcut })
   return JSON.parse(output)
@@ -177,6 +269,22 @@ function samePath(left, right) {
 
 function sha256(filename) {
   return crypto.createHash('sha256').update(fs.readFileSync(filename)).digest('hex')
+}
+
+function snapshotShortcut(shortcut, index) {
+  if (!fs.existsSync(shortcut)) return
+  const stat = fs.lstatSync(shortcut)
+  assert.equal(stat.isFile(), true, `shortcut is not a regular file: ${shortcut}`)
+  assert.equal(stat.isSymbolicLink(), false, `shortcut cannot be a symbolic link: ${shortcut}`)
+  const shortcutReportDirectory = path.join(reportRoot, 'shortcuts')
+  fs.mkdirSync(shortcutReportDirectory, { recursive: true })
+  const snapshot = path.join(shortcutReportDirectory, `shortcut-${index + 1}.lnk`)
+  fs.copyFileSync(shortcut, snapshot)
+  fs.writeFileSync(`${snapshot}.json`, `${JSON.stringify({
+    source: shortcut,
+    size: stat.size,
+    sha256: sha256(shortcut),
+  }, null, 2)}\n`, 'utf8')
 }
 
 function readInstallMarker(installDirectory) {
@@ -277,7 +385,8 @@ async function cleanupOwnedRemnants(installDirectory, shortcuts, localAppData) {
     )
   }
   const ownedShortcuts = []
-  for (const shortcut of shortcuts) {
+  for (const [index, shortcut] of shortcuts.entries()) {
+    snapshotShortcut(shortcut, index)
     const link = await readShortcut(shortcut)
     if (!link) continue
     assert.equal(samePath(link.target, expectedExecutable), true, 'refusing to clean another shortcut')
@@ -365,7 +474,8 @@ async function validateInstalledState(installDirectory, shortcuts) {
   const marker = readInstallMarker(installDirectory)
   assert.equal(identities[0].installInstanceToken, marker.installInstance)
 
-  for (const shortcut of shortcuts) {
+  for (const [index, shortcut] of shortcuts.entries()) {
+    snapshotShortcut(shortcut, index)
     const link = await readShortcut(shortcut)
     assert.ok(link, `shortcut is missing: ${shortcut}`)
     assert.equal(
@@ -373,6 +483,7 @@ async function validateInstalledState(installDirectory, shortcuts) {
       true,
       `shortcut target is wrong: ${shortcut}; actual=${link.target}; expected=${executable}`,
     )
+    assert.equal(link.arguments, '', `shortcut has unexpected arguments: ${shortcut}`)
   }
 
   return {

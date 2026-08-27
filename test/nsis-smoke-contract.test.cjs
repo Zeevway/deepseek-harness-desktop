@@ -57,6 +57,15 @@ test('NSIS smoke verifies install, repair, shortcuts, registry, and both uninsta
   assert.match(smoke, /must-survive\.json/u)
   assert.match(smoke, /waitForRegistryCleanup/u)
   assert.match(smoke, /fs\.realpathSync\.native/u)
+  assert.match(smoke, /IShellLinkW/u)
+  assert.match(smoke, /IPersistFile/u)
+  assert.match(smoke, /DshShellLinkReader/u)
+  assert.match(smoke, /IShellLinkW\.GetArguments/u)
+  assert.match(smoke, /IShellLinkW\.GetPath returned an empty target/u)
+  assert.match(smoke, /snapshotShortcut\(shortcut, index\)[\s\S]*readShortcut\(shortcut\)/u)
+  assert.match(smoke, /assert\.equal\(link\.arguments, ''/u)
+  assert.doesNotMatch(smoke, /WScript\.Shell/u)
+  assert.match(smoke, /shortcut-\$\{index \+ 1\}\.lnk/u)
   assert.match(smoke, /actual=\$\{link\.target\}; expected=\$\{executable\}/u)
   assert.doesNotMatch(smoke, /manifest\.name, manifest\.build\.win\.executableName/u)
   assert.doesNotMatch(smoke, /rmSync\(installDirectory/u)
@@ -70,6 +79,7 @@ test('both Windows workflows execute the final installer smoke', () => {
   assert.match(release, /npm audit --omit=dev --audit-level=high/u)
   assert.match(ci, /capture-ui\.cjs/u)
   assert.match(release, /capture-ui\.cjs/u)
+  assert.match(release, /Upload failure diagnostics/u)
 })
 
 test('release-only update requirements do not leak into unit tests', () => {

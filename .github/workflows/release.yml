@@ -70,6 +70,15 @@ jobs:
       - name: Smoke test final x64 NSIS install, repair, and uninstall
         run: npm run test:installer
 
+      - name: Upload failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: deepseek-harness-desktop-failure-${{ github.run_attempt }}
+          path: test-results/
+          if-no-files-found: ignore
+          retention-days: 14
+
       - name: Upload reproducible release bundle
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
