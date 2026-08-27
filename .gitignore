@@ -1,0 +1,12 @@
+node_modules/
+release/
+.cache/
+.test-dsh-home/
+.dsh-home/
+.npm-cache/
+dist/
+package/
+deepseek-ai-dsh-*.tgz
+*.log
+test-results/
+.diagnostic-installer-*/

@@ -1,0 +1,128 @@
+{
+  "name": "deepseek-harness-desktop",
+  "version": "0.3.0",
+  "private": true,
+  "description": "A Windows desktop wrapper for the official DeepSeek Harness.",
+  "main": "src/main.cjs",
+  "author": "DeepSeek Harness Desktop contributors",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test",
+    "test:dsh": "node scripts/smoke-dsh.cjs",
+    "test:installer": "node scripts/smoke-nsis.cjs --allow-install",
+    "verify": "node scripts/check-version-consistency.cjs && node scripts/check-runtime-dependencies.cjs && node scripts/check-powershell-syntax.cjs",
+    "release:clean": "node scripts/clean-release.cjs",
+    "release:prepare": "npm run release:clean && npm run verify",
+    "release:check-tag": "node scripts/check-release-tag.cjs",
+    "release:finalize": "npm run verify && node scripts/check-packaged-dependencies.cjs --all && node scripts/generate-third-party-licenses.cjs && node scripts/generate-sbom.cjs && node scripts/generate-release-metadata.cjs",
+    "release:finalize:x64": "npm run verify && node scripts/check-packaged-dependencies.cjs --expected=x64 && node scripts/generate-third-party-licenses.cjs && node scripts/generate-sbom.cjs && node scripts/generate-release-metadata.cjs --expected=x64",
+    "release:finalize:arm64": "npm run verify && node scripts/check-packaged-dependencies.cjs --expected=arm64 && node scripts/generate-third-party-licenses.cjs && node scripts/generate-sbom.cjs && node scripts/generate-release-metadata.cjs --expected=arm64",
+    "pack": "npm run verify && node scripts/ensure-target-runtime.cjs x64 && electron-builder --config scripts/electron-builder.config.cjs --publish never --win dir --x64",
+    "pack:x64": "npm run verify && node scripts/ensure-target-runtime.cjs x64 && electron-builder --config scripts/electron-builder.config.cjs --publish never --win dir --x64",
+    "pack:arm64": "npm run verify && node scripts/ensure-target-runtime.cjs arm64 && electron-builder --config scripts/electron-builder.config.cjs --publish never --win dir --arm64",
+    "prebuild": "npm run release:prepare",
+    "build": "node scripts/ensure-target-runtime.cjs x64 && node scripts/ensure-target-runtime.cjs arm64 && electron-builder --config scripts/electron-builder.config.cjs --publish never --win nsis --x64 --arm64",
+    "postbuild": "npm run release:finalize",
+    "build:x64": "npm run release:prepare && node scripts/ensure-target-runtime.cjs x64 && electron-builder --config scripts/electron-builder.config.cjs --publish never --win nsis --x64 && npm run release:finalize:x64",
+    "build:arm64": "npm run release:prepare && node scripts/ensure-target-runtime.cjs arm64 && electron-builder --config scripts/electron-builder.config.cjs --publish never --win nsis --arm64 && npm run release:finalize:arm64"
+  },
+  "dependencies": {
+    "@deepseek-ai/cordis-plugin-group": "1.0.1",
+    "@deepseek-ai/dsh": "0.1.1-rc.2",
+    "@deepseek-ai/dsh-anonymous-user-id": "0.1.1-rc.2",
+    "@deepseek-ai/dsh-atomic-write": "0.1.1-rc.2",
+    "@deepseek-ai/dsh-authorization": "0.1.1-rc.2",
+    "@deepseek-ai/dsh-bash-local": "0.1.1-rc.2",
+    "@deepseek-ai/dsh-code-runtime": "0.1.1-rc.2",
+    "@deepseek-ai/dsh-compaction": "0.1.1-rc.2",
+    "@deepseek-ai/dsh-fs": "0.1.1-rc.2",
+    "@deepseek-ai/dsh-invariants": "0.1.1-rc.2",
+    "@deepseek-ai/dsh-output-retention": "0.1.1-rc.2",
+    "@deepseek-ai/dsh-sandbox": "0.1.1-rc.2",
+    "@deepseek-ai/dsh-scope": "0.1.1-rc.2",
+    "@deepseek-ai/dsh-session-telemetry": "0.1.1-rc.2",
+    "@deepseek-ai/dsh-session-title-llm": "0.1.1-rc.2",
+    "@deepseek-ai/dsh-shell": "0.1.1-rc.2",
+    "@deepseek-ai/dsh-spill": "0.1.1-rc.2",
+    "@deepseek-ai/dsh-subagent-in-process-driver": "0.1.1-rc.2",
+    "@deepseek-ai/dsh-subprocess": "0.1.1-rc.2",
+    "@deepseek-ai/dsh-timeout": "0.1.1-rc.2",
+    "@deepseek-ai/dsh-workflow": "0.1.1-rc.2",
+    "commander": "15.0.0",
+    "electron-updater": "6.8.9",
+    "isexe": "2.0.0",
+    "mime-db": "1.54.0",
+    "mime-types": "3.0.2",
+    "pnpm": "11.24.0",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "retry": "0.13.1",
+    "semver": "7.8.5",
+    "which": "2.0.2"
+  },
+  "devDependencies": {
+    "@electron/asar": "3.4.1",
+    "electron": "37.10.3",
+    "electron-builder": "26.15.3",
+    "js-yaml": "4.3.1",
+    "tar": "7.5.22",
+    "ws": "8.21.3"
+  },
+  "build": {
+    "appId": "com.deepseek.harness.desktop",
+    "productName": "DeepSeek Harness 桌面版",
+    "artifactName": "DeepSeek-Harness-Desktop-Setup-${version}-${arch}.${ext}",
+    "copyright": "Copyright (c) 2026 DeepSeek Harness Desktop contributors",
+    "asar": true,
+    "asarUnpack": [
+      "src/harness-runner.mjs"
+    ],
+    "npmRebuild": false,
+    "nodeGypRebuild": false,
+    "directories": {
+      "output": "release",
+      "buildResources": "assets"
+    },
+    "files": [
+      "src/*.cjs",
+      "src/*.mjs",
+      "src/ui/**/*",
+      "assets/icon.svg",
+      "assets/icon.png",
+      "LICENSE",
+      "THIRD_PARTY_NOTICES.md",
+      "package.json"
+    ],
+    "win": {
+      "icon": "assets/icon.png",
+      "executableName": "DeepSeek Harness Desktop",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowElevation": false,
+      "allowToChangeInstallationDirectory": true,
+      "buildUniversalInstaller": false,
+      "include": "assets/installer.nsh",
+      "createDesktopShortcut": "always",
+      "createStartMenuShortcut": true,
+      "shortcutName": "DeepSeek Harness 桌面版",
+      "runAfterFinish": true,
+      "deleteAppDataOnUninstall": false,
+      "installerLanguages": [
+        "zh_CN"
+      ],
+      "displayLanguageSelector": false
+    }
+  }
+}

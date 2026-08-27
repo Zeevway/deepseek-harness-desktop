@@ -1,0 +1,127 @@
+name: Build Windows release
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    env:
+      # Authenticode is intentionally disabled by product policy.
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      DSH_DESKTOP_REQUIRE_UPDATE_CONFIG: '1'
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24.15.0'
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci --legacy-peer-deps --no-audit --no-fund
+
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Verify versions and runtime closure
+        run: npm run verify
+
+      - name: Verify tag matches package version
+        if: startsWith(github.ref, 'refs/tags/')
+        run: npm run release:check-tag
+
+      - name: Run unit tests
+        run: npm test
+
+      - name: Run Harness migration smoke
+        run: npm run test:dsh
+
+      - name: Confirm unsigned release policy
+        shell: pwsh
+        run: |
+          if ($env:CSC_LINK -or $env:WIN_CSC_LINK) {
+            throw 'Signing credentials must not be supplied while unsigned release policy is active.'
+          }
+          Write-Output 'Building unsigned artifacts by explicit product policy.'
+
+      - name: Build x64 and ARM64 installers
+        run: npm run build
+
+      - name: Smoke test packaged x64 application
+        run: node scripts/smoke-packaged.cjs
+
+      - name: Verify packaged UI at desktop, high DPI, and high contrast
+        run: node scripts/capture-ui.cjs "release/win-unpacked/DeepSeek Harness Desktop.exe"
+
+      - name: Smoke test final x64 NSIS install, repair, and uninstall
+        run: npm run test:installer
+
+      - name: Upload reproducible release bundle
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: deepseek-harness-desktop-release
+          path: |
+            release/DeepSeek-Harness-Desktop-Setup-*.exe
+            release/DeepSeek-Harness-Desktop-Setup-*.exe.blockmap
+            release/latest.yml
+            release/preview.yml
+            release/*.json
+            release/*.txt
+            release/*.html
+            release/LICENSE
+          if-no-files-found: error
+          retention-days: 30
+
+  publish:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download verified release bundle
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: deepseek-harness-desktop-release
+          path: release
+
+      - name: Publish tagged GitHub release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          channel_file="release/latest.yml"
+          prerelease_flag=()
+          if [[ "${GITHUB_REF_NAME}" == *-* ]]; then
+            channel_file="release/preview.yml"
+            prerelease_flag+=(--prerelease)
+          fi
+          gh release create "${GITHUB_REF_NAME}" \
+            release/DeepSeek-Harness-Desktop-Setup-*.exe \
+            release/DeepSeek-Harness-Desktop-Setup-*.exe.blockmap \
+            "${channel_file}" \
+            release/SHA256SUMS.txt \
+            release/release-manifest.json \
+            release/*.sbom.cdx.json \
+            release/THIRD-PARTY-LICENSES.* \
+            release/ELECTRON-LICENSE.txt \
+            release/ELECTRON-CHROMIUM-LICENSES.html \
+            release/LICENSE \
+            --verify-tag \
+            --generate-notes \
+            "${prerelease_flag[@]}" \
+            --title "DeepSeek Harness Desktop ${GITHUB_REF_NAME}"
