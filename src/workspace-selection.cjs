@@ -25,6 +25,17 @@ function isUncPath(value) {
   return /^(?:\\\\|\/\/)[^\\/]+[\\/][^\\/]+/u.test(String(value))
 }
 
+function comparablePaths(value) {
+  const resolved = path.resolve(value)
+  let realPath = resolved
+  try {
+    realPath = fs.realpathSync.native(resolved)
+  } catch {
+    try { realPath = fs.realpathSync(resolved) } catch { realPath = resolved }
+  }
+  return [...new Set([resolved, realPath].map(normalizePathForComparison))]
+}
+
 function risk(code, severity, message, requiresConfirmation = true) {
   return { code, severity, message, requiresConfirmation }
 }
@@ -129,7 +140,7 @@ function inspectWorkspace(workspace, options = {}) {
     process.env.OneDrive,
     process.env.OneDriveCommercial,
     process.env.OneDriveConsumer,
-  ]).filter(Boolean)
+  ]).filter(Boolean).flatMap(comparablePaths)
   if (cloudRoots.some((cloudRoot) => evaluatedPaths.some((candidate) => isSameOrInside(candidate, cloudRoot)))) {
     risks.push(risk('cloud-synced-directory', 'medium', '同步盘可能产生冲突、延迟或额外上传'))
   }

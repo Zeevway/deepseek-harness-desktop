@@ -16,7 +16,6 @@ jobs:
     env:
       # Authenticode is intentionally disabled by product policy.
       CSC_IDENTITY_AUTO_DISCOVERY: 'false'
-      DSH_DESKTOP_REQUIRE_UPDATE_CONFIG: '1'
 
     steps:
       - name: Check out source
@@ -59,6 +58,8 @@ jobs:
 
       - name: Build x64 and ARM64 installers
         run: npm run build
+        env:
+          DSH_DESKTOP_REQUIRE_UPDATE_CONFIG: '1'
 
       - name: Smoke test packaged x64 application
         run: node scripts/smoke-packaged.cjs

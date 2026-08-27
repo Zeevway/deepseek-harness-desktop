@@ -266,9 +266,11 @@ test('normalizes, deduplicates, limits, and filters recent workspaces', (t) => {
 test('evaluates the real target of a linked workspace for risk', (t) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'dsh-workspace-link-'))
   const target = path.join(root, 'cloud-target')
+  const cloudRoot = path.join(root, 'cloud-root-link')
   const linked = path.join(root, 'linked-workspace')
   fs.mkdirSync(target)
   try {
+    fs.symlinkSync(target, cloudRoot, process.platform === 'win32' ? 'junction' : 'dir')
     fs.symlinkSync(target, linked, process.platform === 'win32' ? 'junction' : 'dir')
   } catch (error) {
     fs.rmSync(root, { recursive: true, force: true })
@@ -277,7 +279,7 @@ test('evaluates the real target of a linked workspace for risk', (t) => {
   }
   t.after(() => fs.rmSync(root, { recursive: true, force: true }))
 
-  const result = inspectWorkspace(linked, { cloudRoots: [target], probeWritable: false })
+  const result = inspectWorkspace(linked, { cloudRoots: [cloudRoot], probeWritable: false })
   assert.ok(result.risks.some((entry) => entry.code === 'linked-directory'))
   assert.ok(result.risks.some((entry) => entry.code === 'cloud-synced-directory'))
 })

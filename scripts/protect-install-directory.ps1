@@ -8,6 +8,10 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+# GitHub-hosted pwsh sessions can pass a PowerShell 7 module path to
+# Windows PowerShell. Load the matching built-in ACL cmdlets explicitly.
+Import-Module -Name (Join-Path $PSHOME 'Modules\Microsoft.PowerShell.Security\Microsoft.PowerShell.Security.psd1') -ErrorAction Stop
+
 Add-Type -TypeDefinition @'
 using System;
 using System.ComponentModel;

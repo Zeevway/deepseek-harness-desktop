@@ -4,6 +4,7 @@ const assert = require('node:assert/strict')
 const fs = require('node:fs')
 const path = require('node:path')
 const test = require('node:test')
+const yaml = require('js-yaml')
 
 const projectRoot = path.resolve(__dirname, '..')
 const smoke = fs.readFileSync(path.join(projectRoot, 'scripts', 'smoke-nsis.cjs'), 'utf8')
@@ -67,4 +68,12 @@ test('both Windows workflows execute the final installer smoke', () => {
   assert.match(release, /npm audit --omit=dev --audit-level=high/u)
   assert.match(ci, /capture-ui\.cjs/u)
   assert.match(release, /capture-ui\.cjs/u)
+})
+
+test('release-only update requirements do not leak into unit tests', () => {
+  const workflow = yaml.load(release)
+  const buildJob = workflow.jobs.build
+  const packageStep = buildJob.steps.find((step) => step.name === 'Build x64 and ARM64 installers')
+  assert.equal(buildJob.env.DSH_DESKTOP_REQUIRE_UPDATE_CONFIG, undefined)
+  assert.equal(packageStep.env.DSH_DESKTOP_REQUIRE_UPDATE_CONFIG, '1')
 })

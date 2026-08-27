@@ -12,10 +12,14 @@ const protector = path.join(projectRoot, 'scripts', 'protect-install-directory.p
 const protectorSource = fs.readFileSync(protector, 'utf8')
 
 function powershell(args) {
+  const environment = { ...process.env }
+  for (const key of Object.keys(environment)) {
+    if (key.toLowerCase() === 'psmodulepath') delete environment[key]
+  }
   return spawnSync(
     'powershell.exe',
     ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', ...args],
-    { encoding: 'utf8' },
+    { encoding: 'utf8', env: environment },
   )
 }
 
@@ -200,6 +204,7 @@ test('custom uninstall cleanup honors both interactive and electron-builder dele
 })
 
 test('directory protector contains no-follow traversal, hardlink, and full ACL verification', () => {
+  assert.match(protectorSource, /Import-Module[^\r\n]*Microsoft\.PowerShell\.Security/u)
   assert.match(protectorSource, /SearchOption\]::TopDirectoryOnly/u)
   assert.match(protectorSource, /GetLinkCount/u)
   assert.match(protectorSource, /NumberOfLinks/u)
