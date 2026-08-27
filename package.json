@@ -62,7 +62,7 @@
     "which": "2.0.2"
   },
   "devDependencies": {
-    "@electron/asar": "3.4.1",
+    "@electron/asar": "4.3.0",
     "electron": "37.10.3",
     "electron-builder": "26.15.3",
     "js-yaml": "4.3.1",
