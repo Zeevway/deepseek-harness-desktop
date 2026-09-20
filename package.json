@@ -51,7 +51,7 @@
     "@deepseek-ai/dsh-workflow": "0.1.1-rc.2",
     "commander": "15.0.0",
     "electron-updater": "6.8.9",
-    "isexe": "2.0.0",
+    "isexe": "4.0.0",
     "mime-db": "1.54.0",
     "mime-types": "3.0.2",
     "pnpm": "11.24.0",
